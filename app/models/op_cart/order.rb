@@ -61,13 +61,20 @@ module OpCart
         self.processor_token = nil
       end
 
-      self.processor_response = Stripe::Charge.create(
-        amount: total,
-        description: charge_description,
-        currency: "usd",
-        customer: customer.processor_token
-      ).to_hash
-      self.status = :paid if processor_response['captured']
+      if total.zero? # this exists because we now have products that cost zero dollars
+        self.status = :paid
+        self.processor_response = {
+          customer_token: customer.processor_token
+        }
+      else
+        self.processor_response = Stripe::Charge.create(
+          amount: total,
+          description: charge_description,
+          currency: "usd",
+          customer: customer.processor_token
+        ).to_hash
+        self.status = :paid if processor_response['captured']
+      end
     rescue Stripe::InvalidRequestError, Stripe::CardError => e
       self.processor_token = nil
       if e.try(:code) == 'card_declined'
